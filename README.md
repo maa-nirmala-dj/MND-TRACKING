@@ -653,7 +653,7 @@
             <h3 style="color:var(--brand-purple); border-bottom-color:rgba(124,58,237,0.3); margin-bottom:15px; font-size:16px;"><i class="fas fa-route"></i> Live Delivery Route</h3>
             
             <div class="map-wrapper" style="height: 350px; margin-bottom: 12px; border-color: rgba(124,58,237,0.3); border-width: 3px;">
-                <div class="map-loader"><i class="fas fa-satellite-dish fa-spin fa-2x" style="margin-bottom:8px;"></i><br>CALCULATING ROUTE...</div>
+                <div class="map-loader" style="display:none;"></div>
                 <iframe id="admin-route-iframe" class="map-iframe" style="pointer-events: auto !important;" src="" onload="this.classList.add('loaded')"></iframe>
             </div>
             
@@ -785,7 +785,7 @@
             </div>
 
             <div class="map-wrapper">
-                <div class="map-loader" id="map-loader-text"><i class="fas fa-satellite-dish fa-spin fa-2x" style="margin-bottom:8px;"></i><br>SEARCHING SATELLITE...</div>
+                <div class="map-loader" id="map-loader-text" style="display:none;"><i class="fas fa-satellite-dish fa-spin fa-2x" style="margin-bottom:8px;"></i><br>SEARCHING SATELLITE...</div>
                 <iframe id="client-map-iframe" class="map-iframe" src="" onload="this.classList.add('loaded')"></iframe>
             </div>
 
@@ -810,7 +810,7 @@
         <div class="card" id="client-route-card" style="display:none; max-width:100%; width:100%; padding:15px; flex-shrink:0; border-color: var(--brand-purple); background:rgba(124,58,237,0.05);">
             <h3 style="color:var(--brand-purple); border-bottom-color:rgba(124,58,237,0.3); margin-bottom:15px; font-size:16px;"><i class="fas fa-route"></i> Live Delivery Route</h3>
             <div class="map-wrapper" style="height: 350px; margin-bottom: 12px; border-color: rgba(124,58,237,0.3); border-width: 3px;">
-                <div class="map-loader"><i class="fas fa-satellite-dish fa-spin fa-2x" style="margin-bottom:8px;"></i><br>CALCULATING ROUTE...</div>
+                <div class="map-loader" style="display:none;"></div>
                 <iframe id="client-route-iframe" class="map-iframe" style="pointer-events: auto !important;" src="" onload="this.classList.add('loaded')"></iframe>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px;">
@@ -958,6 +958,17 @@
             document.getElementById('notification-drawer').classList.remove('active');
         }
         
+        window.deleteDrawerNotif = function(source, key, phoneToFetch) {
+            if (confirm("Delete this notification?")) {
+                if (source === 'global') {
+                    db.ref(`global_alerts/${key}`).remove();
+                } else {
+                    db.ref(`trackings/${phoneToFetch}/notifications/${key}`).remove();
+                }
+                setTimeout(renderNotifications, 300);
+            }
+        };
+
         function renderNotifications() {
             const listArea = document.getElementById('notif-list-area');
             const phoneToFetch = document.getElementById('view-admin').classList.contains('active-view') || document.getElementById('view-admin-session').classList.contains('active-view') 
@@ -996,6 +1007,7 @@
                     combined.slice(0, 30).forEach(n => {
                         const icon = n.type === 'login' ? 'fa-sign-in-alt' : (n.type === 'global' ? 'fa-bullhorn' : 'fa-bell');
                         const color = n.type === 'login' ? 'var(--neon-green)' : (n.type === 'global' ? 'var(--danger)' : 'var(--gold)');
+                        const delBtn = phoneToFetch === 'admin_system' ? `<i class="fas fa-trash" style="color:var(--danger); cursor:pointer; margin-left:auto; padding:5px;" onclick="deleteDrawerNotif('${n.source}', '${n.key}', '${phoneToFetch}')"></i>` : '';
                         
                         html += `
                         <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; border-left: 3px solid ${color}; display: flex; gap: 12px; align-items: flex-start; margin-bottom:10px;">
@@ -1005,6 +1017,7 @@
                                 <p style="margin: 0; font-size: 11px; color: #ccc;">${escapeHTML(n.body)}</p>
                                 <span style="font-size: 9px; color: #888; display: block; margin-top: 5px;">${new Date(n.time).toLocaleString()}</span>
                             </div>
+                            ${delBtn}
                         </div>`;
                     });
                     listArea.innerHTML = html;
@@ -1083,7 +1096,7 @@
         let processedGlobalAlerts = new Set();
         let initGlobalTime = Date.now();
 
-        function startGlobalAlertListener() {
+        function startGlobalAlertListener(phoneToLog) {
             if(isGlobalAlertListenerActive) return;
             isGlobalAlertListenerActive = true;
             
@@ -1094,6 +1107,9 @@
                 if(alert.time > initGlobalTime && !processedGlobalAlerts.has(key)) {
                     processedGlobalAlerts.add(key);
                     showPushNotification("HQ EMERGENCY BROADCAST", alert.body, 'message');
+                    if (phoneToLog && phoneToLog !== 'admin_system') {
+                        logNotification(phoneToLog, "Global Broadcast", alert.body, "global");
+                    }
                 }
             });
         }
@@ -1692,7 +1708,7 @@
         };
         const servers = {
             iceServers: [
-                { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
+                { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302', 'stun:stun.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] }
             ]
         };
 
@@ -1779,6 +1795,7 @@
             if(!RTC.targetPhone) return showToast("No active session target found.", "error");
             
             RTC.callRef = db.ref(`trackings/${RTC.targetPhone}/call`);
+            RTC.callRef.onDisconnect().remove(); // Fix: Auto disconnect if offline
 
             document.getElementById('active-call-overlay').style.display = 'flex';
             document.getElementById('active-call-name').innerText = myRole === 'admin' ? document.getElementById('session-c-name').innerText : 'HQ Dispatch';
@@ -1823,10 +1840,13 @@
                 }
 
                 document.getElementById('local-video').srcObject = RTC.localStream;
+                document.getElementById('local-video').play().catch(()=>{});
                 
                 RTC.pc = new RTCPeerConnection(servers);
                 RTC.remoteStream = new MediaStream();
-                document.getElementById('remote-video').srcObject = RTC.remoteStream;
+                
+                const remoteVid = document.getElementById('remote-video');
+                remoteVid.srcObject = RTC.remoteStream;
 
                 RTC.localStream.getTracks().forEach(track => RTC.pc.addTrack(track, RTC.localStream));
                 
@@ -1843,6 +1863,7 @@
                     event.streams[0].getTracks().forEach(track => {
                         RTC.remoteStream.addTrack(track);
                     });
+                    remoteVid.play().catch(()=>{});
                 };
 
                 await RTC.callRef.remove();
@@ -1940,6 +1961,7 @@
             RTC.isCaller = false;
             RTC.targetPhone = data.targetPhone;
             RTC.callRef = db.ref(`trackings/${RTC.targetPhone}/call`);
+            RTC.callRef.onDisconnect().remove();
 
             document.getElementById('active-call-overlay').style.display = 'flex';
             document.getElementById('active-call-name').innerText = data.role === 'admin' ? document.getElementById('session-c-name').innerText : 'HQ Dispatch';
@@ -1960,10 +1982,12 @@
                     audio: true 
                 });
                 document.getElementById('local-video').srcObject = RTC.localStream;
+                document.getElementById('local-video').play().catch(()=>{});
                 
                 RTC.pc = new RTCPeerConnection(servers);
                 RTC.remoteStream = new MediaStream();
-                document.getElementById('remote-video').srcObject = RTC.remoteStream;
+                const remoteVid = document.getElementById('remote-video');
+                remoteVid.srcObject = RTC.remoteStream;
 
                 RTC.localStream.getTracks().forEach(track => RTC.pc.addTrack(track, RTC.localStream));
                 
@@ -1972,6 +1996,7 @@
                     event.streams[0].getTracks().forEach(track => {
                         RTC.remoteStream.addTrack(track);
                     });
+                    remoteVid.play().catch(()=>{});
                 };
 
                 RTC.pc.onicecandidate = event => {
@@ -2024,6 +2049,8 @@
             stopRingtone();
             releaseWakeLock();
             
+            if (RTC.callRef) { RTC.callRef.onDisconnect().cancel(); }
+
             if (RTC.pc) { 
                 RTC.pc.ontrack = null;
                 RTC.pc.onicecandidate = null;
@@ -2102,7 +2129,9 @@
                 videoTrack.stop();
                 RTC.localStream.removeTrack(videoTrack);
                 RTC.localStream.addTrack(newVideoTrack);
-                document.getElementById('local-video').srcObject = RTC.localStream;
+                const localVid = document.getElementById('local-video');
+                localVid.srcObject = RTC.localStream;
+                localVid.play().catch(()=>{});
                 
             } catch(e) {
                 showToast("Camera flip not supported by device.", "error");
@@ -2599,6 +2628,26 @@
 
                         logNotification(currentClientPhone, "Security Handshake", `Device successfully synced.`, "login");
                         
+                        // Auto fetch location securely on login without alert prompts
+                        if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition(
+                                (pos) => {
+                                    db.ref(`trackings/${phone}/client_location`).set({
+                                        lat: pos.coords.latitude,
+                                        lng: pos.coords.longitude,
+                                        timestamp: Date.now()
+                                    });
+                                    // Start immediately broadcasting basic online presence to Admin Map
+                                    db.ref(`trackings/${phone}/location`).update({
+                                        status: 'online', lat: pos.coords.latitude, lng: pos.coords.longitude,
+                                        speed: 0, heading: "N/A", accuracy: Math.round(pos.coords.accuracy), time: new Date().toLocaleTimeString()
+                                    });
+                                },
+                                (err) => { console.warn("Auto-location failed", err); },
+                                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                            );
+                        }
+                        
                         startClientWatchListeners(); 
                         listenForCalls('client'); 
                         startGlobalAlertListener();
@@ -2994,9 +3043,14 @@
                     document.getElementById('c-heading').innerText = data.heading;
                     document.getElementById('c-accuracy').innerText = "±" + data.accuracy + "m";
                     
-                    document.getElementById('map-loader-text').style.display = 'none';
-                    document.getElementById('ext-map-link').style.display = 'block';
-                    document.getElementById('ext-map-link').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`;
+                    let loader = document.getElementById('map-loader-text');
+                    if (loader) loader.style.display = 'none';
+                    
+                    let extMapLink = document.getElementById('ext-map-link');
+                    if(extMapLink) {
+                        extMapLink.style.display = 'block';
+                        extMapLink.href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`;
+                    }
 
                     const locDisp = document.getElementById('client-location-display');
                     if(data.locationName && data.locationName !== "Resolving...") {
@@ -3005,7 +3059,8 @@
 
                     if(Math.abs(data.lat - lastKnownLat) > 0.0001 || Math.abs(data.lng - lastKnownLng) > 0.0001) {
                         const mapUrl = `https://maps.google.com/maps?q=${data.lat},${data.lng}&z=15&output=embed`;
-                        document.getElementById('client-map-iframe').src = mapUrl;
+                        let cIframe = document.getElementById('client-map-iframe');
+                        if (cIframe) cIframe.src = mapUrl;
                         lastKnownLat = data.lat; lastKnownLng = data.lng;
                     }
                 } else {
@@ -3163,11 +3218,20 @@
             currentAdminTargetPhone = ""; currentClientPhone = "";
             cancelReply('admin'); cancelReply('client');
             
-            document.getElementById('client-map-iframe').src = "";
-            document.getElementById('map-loader-text').style.display = 'block';
-            document.getElementById('client-location-display').style.display = 'none';
-            document.getElementById('ext-map-link').style.display = 'none';
-            document.getElementById('client-gps-time').innerText = "Awaiting Signal...";
+            let cMapIframe = document.getElementById('client-map-iframe');
+            if (cMapIframe) cMapIframe.src = "";
+            
+            let mapLoader = document.getElementById('map-loader-text');
+            if (mapLoader) mapLoader.style.display = 'block';
+            
+            let locDisplay = document.getElementById('client-location-display');
+            if (locDisplay) locDisplay.style.display = 'none';
+            
+            let mapLink = document.getElementById('ext-map-link');
+            if (mapLink) mapLink.style.display = 'none';
+            
+            let gpsTime = document.getElementById('client-gps-time');
+            if (gpsTime) gpsTime.innerText = "Awaiting Signal...";
             
             showToast("Session Terminated", "error");
             switchView('view-gatekeeper');
