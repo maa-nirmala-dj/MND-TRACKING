@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -141,8 +140,8 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.8); transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); 
         }
 
-        /* Fixed Chat Size - PERFECT AND REAL SIZE (Increased Height) */
-        .chat-minimized { height: 55vh !important; min-height: 480px !important; max-height: 650px !important; }
+        /* Fixed Chat Size - Increased Perfectly for Great UX */
+        .chat-minimized { height: 65vh !important; min-height: 500px !important; max-height: 700px !important; }
         
         /* This applies ONLY when user manually clicks expand button */
         .chat-fullscreen { 
@@ -447,8 +446,12 @@
         </div>
     </div>
 
+    <!-- ACTIVE CALL OVERLAY (Modified to guarantee Audio routing) -->
     <div id="active-call-overlay">
         <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover; position:absolute; inset:0; z-index:1;"></video>
+        <!-- Adding explicit audio tag to guarantee Mobile Voice playback -->
+        <audio id="remote-audio" autoplay playsinline></audio>
+        
         <video id="local-video" autoplay playsinline muted style="width:110px; height:150px; object-fit:cover; position:absolute; bottom:120px; right:20px; z-index:2; border-radius:12px; border:2px solid var(--gold); box-shadow:0 10px 20px rgba(0,0,0,0.8); background:#222;"></video>
         
         <div style="position:absolute; top:50px; left:0; right:0; text-align:center; z-index:3; text-shadow:0 2px 5px rgba(0,0,0,0.8);">
@@ -580,6 +583,9 @@
             <a href="https://maa-nirmala-dj.github.io/-tent-house./" target="_blank" class="mn-btn btn-dark" style="text-decoration: none;">
                 <i class="fas fa-globe"></i> VISIT OFFICIAL WEBSITE
             </a>
+            <a href="https://maa-nirmala-dj.github.io/WELCOME-TO-MND-HUB/" target="_blank" class="mn-btn btn-gold" style="text-decoration: none; background: linear-gradient(135deg, var(--brand-purple) 0%, #9333ea 100%); color:#fff; box-shadow: 0 5px 20px rgba(124,58,237,0.4); border:none;">
+                <i class="fas fa-layer-group"></i> MND HUB PORTAL
+            </a>
         </div>
         <div class="app-footer">Powered by Maa Nirmala DJ</div>
     </div>
@@ -654,7 +660,6 @@
             <h3 style="color:var(--brand-purple); border-bottom-color:rgba(124,58,237,0.3); margin-bottom:15px; font-size:16px;"><i class="fas fa-route"></i> Live Delivery Route</h3>
             
             <div class="map-wrapper" style="height: 350px; margin-bottom: 12px; border-color: rgba(124,58,237,0.3); border-width: 3px;">
-                <div class="map-loader" style="display:none;"></div>
                 <iframe id="admin-route-iframe" class="map-iframe" style="pointer-events: auto !important;" src="" onload="this.classList.add('loaded')"></iframe>
             </div>
             
@@ -747,6 +752,18 @@
                 </div>
             </div>
         </div>
+        
+        <div style="width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; flex-shrink: 0;">
+            <button class="mn-btn btn-danger" onclick="systemLogout(event)">
+                <i class="fas fa-power-off"></i> DISCONNECT & LOGOUT
+            </button>
+            <a href="https://maa-nirmala-dj.github.io/-tent-house./" target="_blank" class="mn-btn btn-dark" style="text-decoration: none;">
+                <i class="fas fa-globe"></i> VISIT OFFICIAL WEBSITE
+            </a>
+            <a href="https://maa-nirmala-dj.github.io/WELCOME-TO-MND-HUB/" target="_blank" class="mn-btn btn-gold" style="text-decoration: none; background: linear-gradient(135deg, var(--brand-purple) 0%, #9333ea 100%); color:#fff; box-shadow: 0 5px 20px rgba(124,58,237,0.4); border:none;">
+                <i class="fas fa-layer-group"></i> MND HUB PORTAL
+            </a>
+        </div>
         <div class="app-footer">Powered by Maa Nirmala DJ</div>
     </div>
 
@@ -786,7 +803,6 @@
             </div>
 
             <div class="map-wrapper">
-                <div class="map-loader" id="map-loader-text" style="display:none;"><i class="fas fa-satellite-dish fa-spin fa-2x" style="margin-bottom:8px;"></i><br>SEARCHING SATELLITE...</div>
                 <iframe id="client-map-iframe" class="map-iframe" src="" onload="this.classList.add('loaded')"></iframe>
             </div>
 
@@ -811,7 +827,6 @@
         <div class="card" id="client-route-card" style="display:none; max-width:100%; width:100%; padding:15px; flex-shrink:0; border-color: var(--brand-purple); background:rgba(124,58,237,0.05);">
             <h3 style="color:var(--brand-purple); border-bottom-color:rgba(124,58,237,0.3); margin-bottom:15px; font-size:16px;"><i class="fas fa-route"></i> Live Delivery Route</h3>
             <div class="map-wrapper" style="height: 350px; margin-bottom: 12px; border-color: rgba(124,58,237,0.3); border-width: 3px;">
-                <div class="map-loader" style="display:none;"></div>
                 <iframe id="client-route-iframe" class="map-iframe" style="pointer-events: auto !important;" src="" onload="this.classList.add('loaded')"></iframe>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px;">
@@ -910,6 +925,9 @@
             </button>
             <a href="https://maa-nirmala-dj.github.io/-tent-house./" target="_blank" class="mn-btn btn-dark" style="text-decoration: none;">
                 <i class="fas fa-globe"></i> VISIT OFFICIAL WEBSITE
+            </a>
+            <a href="https://maa-nirmala-dj.github.io/WELCOME-TO-MND-HUB/" target="_blank" class="mn-btn btn-gold" style="text-decoration: none; background: linear-gradient(135deg, var(--brand-purple) 0%, #9333ea 100%); color:#fff; box-shadow: 0 5px 20px rgba(124,58,237,0.4); border:none;">
+                <i class="fas fa-layer-group"></i> MND HUB PORTAL
             </a>
         </div>
         <div class="app-footer">Powered by Maa Nirmala DJ</div>
@@ -1819,7 +1837,7 @@
                         });
                         
                         try {
-                            const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            const micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
                             const audioTrack = micStream.getAudioTracks()[0];
                             if(audioTrack) {
                                 RTC.localStream.addTrack(audioTrack);
@@ -1834,10 +1852,11 @@
                     }
                 } else {
                     currentFacingMode = 'user';
-                    RTC.localStream = await navigator.mediaDevices.getUserMedia({ 
-                        video: type === 'video' ? { facingMode: currentFacingMode } : false, 
-                        audio: true 
-                    });
+                    const constraints = {
+                        video: type === 'video' ? { facingMode: currentFacingMode } : false,
+                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                    };
+                    RTC.localStream = await navigator.mediaDevices.getUserMedia(constraints);
                 }
 
                 document.getElementById('local-video').srcObject = RTC.localStream;
@@ -1847,7 +1866,7 @@
                 RTC.remoteStream = new MediaStream();
                 
                 const remoteVid = document.getElementById('remote-video');
-                remoteVid.srcObject = RTC.remoteStream;
+                const remoteAud = document.getElementById('remote-audio');
 
                 RTC.localStream.getTracks().forEach(track => RTC.pc.addTrack(track, RTC.localStream));
                 
@@ -1855,20 +1874,23 @@
                     stopRingbackTone();
                     document.getElementById('active-call-status').innerText = 'Connected';
                     
-                    remoteVid.muted = false;
-                    remoteVid.volume = 1.0;
-                    
-                    if (event.streams && event.streams[0]) {
-                        remoteVid.srcObject = event.streams[0];
-                    } else {
-                        let inboundStream = new MediaStream();
-                        inboundStream.addTrack(event.track);
-                        remoteVid.srcObject = inboundStream;
+                    if (event.track.kind === 'video') {
+                        let stream = event.streams[0] || new MediaStream([event.track]);
+                        remoteVid.srcObject = stream;
+                        remoteVid.play().catch(()=>{});
                     }
-                    
-                    remoteVid.onloadedmetadata = () => {
-                        remoteVid.play().catch(err => console.warn("Remote video play error", err));
-                    };
+                    if (event.track.kind === 'audio') {
+                        let stream = event.streams[0] || new MediaStream([event.track]);
+                        remoteAud.srcObject = stream;
+                        remoteAud.play().catch(()=>{});
+                    }
+                };
+
+                RTC.pc.oniceconnectionstatechange = () => {
+                    if (RTC.pc.iceConnectionState === 'disconnected' || RTC.pc.iceConnectionState === 'failed') {
+                        endCallLocal();
+                        showToast("Call lost due to network issues.", "error");
+                    }
                 };
 
                 await RTC.callRef.remove();
@@ -1985,10 +2007,11 @@
 
             try {
                 currentFacingMode = 'user';
-                RTC.localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: (data.type === 'video' || data.type === 'screen') ? { facingMode: currentFacingMode } : false, 
-                    audio: true 
-                });
+                const constraints = {
+                    video: (data.type === 'video' || data.type === 'screen') ? { facingMode: currentFacingMode } : false,
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                };
+                RTC.localStream = await navigator.mediaDevices.getUserMedia(constraints);
                 document.getElementById('local-video').srcObject = RTC.localStream;
                 document.getElementById('local-video').play().catch(()=>{});
                 
@@ -1996,27 +2019,30 @@
                 RTC.remoteStream = new MediaStream();
                 
                 const remoteVid = document.getElementById('remote-video');
-                remoteVid.srcObject = RTC.remoteStream;
+                const remoteAud = document.getElementById('remote-audio');
 
                 RTC.localStream.getTracks().forEach(track => RTC.pc.addTrack(track, RTC.localStream));
                 
                 RTC.pc.ontrack = event => {
                     document.getElementById('active-call-status').innerText = 'Connected';
                     
-                    remoteVid.muted = false;
-                    remoteVid.volume = 1.0;
-                    
-                    if (event.streams && event.streams[0]) {
-                        remoteVid.srcObject = event.streams[0];
-                    } else {
-                        let inboundStream = new MediaStream();
-                        inboundStream.addTrack(event.track);
-                        remoteVid.srcObject = inboundStream;
+                    if (event.track.kind === 'video') {
+                        let stream = event.streams[0] || new MediaStream([event.track]);
+                        remoteVid.srcObject = stream;
+                        remoteVid.play().catch(()=>{});
                     }
-                    
-                    remoteVid.onloadedmetadata = () => {
-                        remoteVid.play().catch(err => console.warn("Remote video play error", err));
-                    };
+                    if (event.track.kind === 'audio') {
+                        let stream = event.streams[0] || new MediaStream([event.track]);
+                        remoteAud.srcObject = stream;
+                        remoteAud.play().catch(()=>{});
+                    }
+                };
+
+                RTC.pc.oniceconnectionstatechange = () => {
+                    if (RTC.pc.iceConnectionState === 'disconnected' || RTC.pc.iceConnectionState === 'failed') {
+                        endCallLocal();
+                        showToast("Call lost due to network issues.", "error");
+                    }
                 };
 
                 RTC.pc.onicecandidate = event => {
@@ -2093,6 +2119,7 @@
             document.getElementById('active-call-overlay').style.display = 'none';
             document.getElementById('local-video').srcObject = null;
             document.getElementById('remote-video').srcObject = null;
+            document.getElementById('remote-audio').srcObject = null;
             document.getElementById('active-call-status').innerText = '';
 
             if (RTC.targetPhone) {
@@ -2144,14 +2171,14 @@
             try {
                 const newStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: currentFacingMode },
-                    audio: true
-                });
+                    audio: false // Only replacing video track
+                }).catch(e => navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })); // Fallback
                 
                 const newVideoTrack = newStream.getVideoTracks()[0];
                 const sender = RTC.pc.getSenders().find(s => s.track && s.track.kind === 'video');
                 
                 if (sender) {
-                    sender.replaceTrack(newVideoTrack);
+                    await sender.replaceTrack(newVideoTrack);
                 }
                 
                 videoTrack.stop();
@@ -2162,7 +2189,7 @@
                 localVid.play().catch(()=>{});
                 
             } catch(e) {
-                showToast("Camera flip not supported by device.", "error");
+                showToast("Camera flip failed or not supported.", "error");
             }
         }
 
