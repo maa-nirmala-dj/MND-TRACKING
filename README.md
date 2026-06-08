@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1795,7 +1796,7 @@
             if(!RTC.targetPhone) return showToast("No active session target found.", "error");
             
             RTC.callRef = db.ref(`trackings/${RTC.targetPhone}/call`);
-            RTC.callRef.onDisconnect().remove(); // Fix: Auto disconnect if offline
+            RTC.callRef.onDisconnect().remove();
 
             document.getElementById('active-call-overlay').style.display = 'flex';
             document.getElementById('active-call-name').innerText = myRole === 'admin' ? document.getElementById('session-c-name').innerText : 'HQ Dispatch';
@@ -1850,20 +1851,24 @@
 
                 RTC.localStream.getTracks().forEach(track => RTC.pc.addTrack(track, RTC.localStream));
                 
-                if (type === 'screen') {
-                    const screenTrack = RTC.localStream.getVideoTracks()[0];
-                    if (screenTrack) {
-                        screenTrack.onended = () => { endCall(); };
-                    }
-                }
-
                 RTC.pc.ontrack = event => {
                     stopRingbackTone();
                     document.getElementById('active-call-status').innerText = 'Connected';
-                    event.streams[0].getTracks().forEach(track => {
-                        RTC.remoteStream.addTrack(track);
-                    });
-                    remoteVid.play().catch(()=>{});
+                    
+                    remoteVid.muted = false;
+                    remoteVid.volume = 1.0;
+                    
+                    if (event.streams && event.streams[0]) {
+                        remoteVid.srcObject = event.streams[0];
+                    } else {
+                        let inboundStream = new MediaStream();
+                        inboundStream.addTrack(event.track);
+                        remoteVid.srcObject = inboundStream;
+                    }
+                    
+                    remoteVid.onloadedmetadata = () => {
+                        remoteVid.play().catch(err => console.warn("Remote video play error", err));
+                    };
                 };
 
                 await RTC.callRef.remove();
@@ -1888,24 +1893,27 @@
 
                 activeCallValueListener = snap => {
                     const data = snap.val();
-                    if(!data) {
+                    if(!data || data.status === 'ended' || data.status === 'declined') {
+                        if (data && data.status === 'declined') showToast("Call declined.", "error");
+                        else if (data && data.status === 'ended') showToast("Call ended.", "success");
                         endCallLocal();
                         return;
                     }
                     if(data.status === 'answered' && data.answer && !RTC.pc.currentRemoteDescription) {
                         stopRingbackTone();
                         document.getElementById('active-call-status').innerText = 'Connected';
-                        RTC.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    }
-                    if(data.status === 'declined') {
-                        showToast("Call declined.", "error");
-                        endCallLocal();
+                        RTC.pc.setRemoteDescription(new RTCSessionDescription(data.answer)).then(() => {
+                            // Remote description set successfully
+                        }).catch(e => console.error("Error setting remote description", e));
                     }
                 };
                 RTC.callRef.on('value', activeCallValueListener);
 
                 iceCalleeListener = snap => {
-                    if(snap.val() && RTC.pc) RTC.pc.addIceCandidate(new RTCIceCandidate(snap.val()));
+                    if(snap.val() && RTC.pc) {
+                        const candidate = new RTCIceCandidate(snap.val());
+                        RTC.pc.addIceCandidate(candidate).catch(e => console.error(e));
+                    }
                 };
                 RTC.callRef.child('iceCandidates/callee').on('child_added', iceCalleeListener);
 
@@ -1939,7 +1947,7 @@
                     window.incomingCallData = { offer: data.offer, type: data.type, role: myRole, targetPhone: targetPhone };
                 }
                 
-                if(!data || data.status === 'declined') {
+                if(!data || data.status === 'ended' || data.status === 'declined') {
                     stopRingtone();
                     releaseWakeLock();
                     document.getElementById('incoming-call-overlay').classList.remove('active');
@@ -1986,6 +1994,7 @@
                 
                 RTC.pc = new RTCPeerConnection(servers);
                 RTC.remoteStream = new MediaStream();
+                
                 const remoteVid = document.getElementById('remote-video');
                 remoteVid.srcObject = RTC.remoteStream;
 
@@ -1993,10 +2002,21 @@
                 
                 RTC.pc.ontrack = event => {
                     document.getElementById('active-call-status').innerText = 'Connected';
-                    event.streams[0].getTracks().forEach(track => {
-                        RTC.remoteStream.addTrack(track);
-                    });
-                    remoteVid.play().catch(()=>{});
+                    
+                    remoteVid.muted = false;
+                    remoteVid.volume = 1.0;
+                    
+                    if (event.streams && event.streams[0]) {
+                        remoteVid.srcObject = event.streams[0];
+                    } else {
+                        let inboundStream = new MediaStream();
+                        inboundStream.addTrack(event.track);
+                        remoteVid.srcObject = inboundStream;
+                    }
+                    
+                    remoteVid.onloadedmetadata = () => {
+                        remoteVid.play().catch(err => console.warn("Remote video play error", err));
+                    };
                 };
 
                 RTC.pc.onicecandidate = event => {
@@ -2015,7 +2035,10 @@
                 });
 
                 iceCallerListener = snap => {
-                    if(snap.val() && RTC.pc) RTC.pc.addIceCandidate(new RTCIceCandidate(snap.val()));
+                    if(snap.val() && RTC.pc) {
+                        const candidate = new RTCIceCandidate(snap.val());
+                        RTC.pc.addIceCandidate(candidate).catch(e => console.error(e));
+                    }
                 };
                 RTC.callRef.child('iceCandidates/caller').on('child_added', iceCallerListener);
 
@@ -2040,7 +2063,12 @@
         }
 
         function endCall() {
-            if(RTC.callRef) RTC.callRef.remove();
+            if(RTC.callRef) {
+                RTC.callRef.update({ status: 'ended' });
+                setTimeout(() => {
+                    if (RTC.callRef) RTC.callRef.remove();
+                }, 500);
+            }
             endCallLocal();
         }
 
