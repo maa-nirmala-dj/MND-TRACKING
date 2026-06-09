@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -140,7 +141,7 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.8); transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); 
         }
 
-        /* Fixed Chat Size - Increased Perfectly for Great UX */
+        /* Fixed Chat Size - PERFECT AND REAL SIZE (Increased Height) */
         .chat-minimized { height: 65vh !important; min-height: 500px !important; max-height: 700px !important; }
         
         /* This applies ONLY when user manually clicks expand button */
@@ -446,11 +447,9 @@
         </div>
     </div>
 
-    <!-- ACTIVE CALL OVERLAY (Modified to guarantee Audio routing) -->
+    <!-- ACTIVE CALL OVERLAY -->
     <div id="active-call-overlay">
         <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover; position:absolute; inset:0; z-index:1;"></video>
-        <!-- Adding explicit audio tag to guarantee Mobile Voice playback -->
-        <audio id="remote-audio" autoplay playsinline></audio>
         
         <video id="local-video" autoplay playsinline muted style="width:110px; height:150px; object-fit:cover; position:absolute; bottom:120px; right:20px; z-index:2; border-radius:12px; border:2px solid var(--gold); box-shadow:0 10px 20px rgba(0,0,0,0.8); background:#222;"></video>
         
@@ -751,18 +750,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div style="width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; flex-shrink: 0;">
-            <button class="mn-btn btn-danger" onclick="systemLogout(event)">
-                <i class="fas fa-power-off"></i> DISCONNECT & LOGOUT
-            </button>
-            <a href="https://maa-nirmala-dj.github.io/-tent-house./" target="_blank" class="mn-btn btn-dark" style="text-decoration: none;">
-                <i class="fas fa-globe"></i> VISIT OFFICIAL WEBSITE
-            </a>
-            <a href="https://maa-nirmala-dj.github.io/WELCOME-TO-MND-HUB/" target="_blank" class="mn-btn btn-gold" style="text-decoration: none; background: linear-gradient(135deg, var(--brand-purple) 0%, #9333ea 100%); color:#fff; box-shadow: 0 5px 20px rgba(124,58,237,0.4); border:none;">
-                <i class="fas fa-layer-group"></i> MND HUB PORTAL
-            </a>
         </div>
         <div class="app-footer">Powered by Maa Nirmala DJ</div>
     </div>
@@ -1723,11 +1710,25 @@
             role: null, 
             isCaller: false,
             callRef: null,
-            targetPhone: null
+            targetPhone: null,
+            iceQueue: [],
+            processIceQueue: async function() {
+                while(this.iceQueue.length > 0) {
+                    const c = this.iceQueue.shift();
+                    try { if(this.pc) await this.pc.addIceCandidate(c); } catch(e){}
+                }
+            }
         };
+        
+        // Premium reliable STUN and TURN fallback servers
         const servers = {
             iceServers: [
-                { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302', 'stun:stun.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] }
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
             ]
         };
 
@@ -1835,25 +1836,20 @@
                             video: true, 
                             audio: false
                         });
-                        
                         try {
                             const micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
                             const audioTrack = micStream.getAudioTracks()[0];
-                            if(audioTrack) {
-                                RTC.localStream.addTrack(audioTrack);
-                            }
-                        } catch(micErr) {
-                            console.warn("Could not attach mic to screen share", micErr);
-                        }
+                            if(audioTrack) RTC.localStream.addTrack(audioTrack);
+                        } catch(micErr) { console.warn("Could not attach mic to screen share", micErr); }
                     } catch (e) {
-                        showToast("Screen sharing was denied or is unsupported.", "error");
+                        showToast("Screen sharing denied.", "error");
                         endCallLocal();
                         return;
                     }
                 } else {
                     currentFacingMode = 'user';
                     const constraints = {
-                        video: type === 'video' ? { facingMode: currentFacingMode } : false,
+                        video: (type === 'video') ? { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } : false,
                         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
                     };
                     RTC.localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -1863,44 +1859,43 @@
                 document.getElementById('local-video').play().catch(()=>{});
                 
                 RTC.pc = new RTCPeerConnection(servers);
-                RTC.remoteStream = new MediaStream();
                 
                 const remoteVid = document.getElementById('remote-video');
-                const remoteAud = document.getElementById('remote-audio');
 
                 RTC.localStream.getTracks().forEach(track => RTC.pc.addTrack(track, RTC.localStream));
                 
+                if (type === 'screen') {
+                    const screenTrack = RTC.localStream.getVideoTracks()[0];
+                    if (screenTrack) screenTrack.onended = () => { endCall(); };
+                }
+
                 RTC.pc.ontrack = event => {
                     stopRingbackTone();
                     document.getElementById('active-call-status').innerText = 'Connected';
                     
-                    if (event.track.kind === 'video') {
-                        let stream = event.streams[0] || new MediaStream([event.track]);
-                        remoteVid.srcObject = stream;
-                        remoteVid.play().catch(()=>{});
+                    if (event.streams && event.streams[0]) {
+                        remoteVid.srcObject = event.streams[0];
+                    } else {
+                        if (!RTC.remoteStream) RTC.remoteStream = new MediaStream();
+                        RTC.remoteStream.addTrack(event.track);
+                        remoteVid.srcObject = RTC.remoteStream;
                     }
-                    if (event.track.kind === 'audio') {
-                        let stream = event.streams[0] || new MediaStream([event.track]);
-                        remoteAud.srcObject = stream;
-                        remoteAud.play().catch(()=>{});
-                    }
+                    
+                    // Force audio output to be active
+                    remoteVid.muted = false;
+                    remoteVid.volume = 1.0;
+                    remoteVid.play().catch(err => console.warn("Remote play error", err));
                 };
 
                 RTC.pc.oniceconnectionstatechange = () => {
                     if (RTC.pc.iceConnectionState === 'disconnected' || RTC.pc.iceConnectionState === 'failed') {
+                        showToast("Call dropped. Connection lost.", "error");
                         endCallLocal();
-                        showToast("Call lost due to network issues.", "error");
                     }
                 };
 
                 await RTC.callRef.remove();
-                
-                RTC.callRef.set({
-                    type: type,
-                    caller: myRole,
-                    status: 'ringing'
-                });
-
+                RTC.callRef.set({ type: type, caller: myRole, status: 'ringing' });
                 playRingbackTone();
 
                 RTC.pc.onicecandidate = event => {
@@ -1925,7 +1920,7 @@
                         stopRingbackTone();
                         document.getElementById('active-call-status').innerText = 'Connected';
                         RTC.pc.setRemoteDescription(new RTCSessionDescription(data.answer)).then(() => {
-                            // Remote description set successfully
+                            RTC.processIceQueue(); // Process any ICE candidates that arrived early
                         }).catch(e => console.error("Error setting remote description", e));
                     }
                 };
@@ -1934,7 +1929,11 @@
                 iceCalleeListener = snap => {
                     if(snap.val() && RTC.pc) {
                         const candidate = new RTCIceCandidate(snap.val());
-                        RTC.pc.addIceCandidate(candidate).catch(e => console.error(e));
+                        if (RTC.pc.remoteDescription && RTC.pc.remoteDescription.type) {
+                            RTC.pc.addIceCandidate(candidate).catch(e => console.error(e));
+                        } else {
+                            RTC.iceQueue.push(candidate);
+                        }
                     }
                 };
                 RTC.callRef.child('iceCandidates/callee').on('child_added', iceCalleeListener);
@@ -2008,7 +2007,7 @@
             try {
                 currentFacingMode = 'user';
                 const constraints = {
-                    video: (data.type === 'video' || data.type === 'screen') ? { facingMode: currentFacingMode } : false,
+                    video: (data.type === 'video' || data.type === 'screen') ? { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } : false,
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
                 };
                 RTC.localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -2016,32 +2015,32 @@
                 document.getElementById('local-video').play().catch(()=>{});
                 
                 RTC.pc = new RTCPeerConnection(servers);
-                RTC.remoteStream = new MediaStream();
                 
                 const remoteVid = document.getElementById('remote-video');
-                const remoteAud = document.getElementById('remote-audio');
 
                 RTC.localStream.getTracks().forEach(track => RTC.pc.addTrack(track, RTC.localStream));
                 
                 RTC.pc.ontrack = event => {
                     document.getElementById('active-call-status').innerText = 'Connected';
                     
-                    if (event.track.kind === 'video') {
-                        let stream = event.streams[0] || new MediaStream([event.track]);
-                        remoteVid.srcObject = stream;
-                        remoteVid.play().catch(()=>{});
+                    if (event.streams && event.streams[0]) {
+                        remoteVid.srcObject = event.streams[0];
+                    } else {
+                        if (!RTC.remoteStream) RTC.remoteStream = new MediaStream();
+                        RTC.remoteStream.addTrack(event.track);
+                        remoteVid.srcObject = RTC.remoteStream;
                     }
-                    if (event.track.kind === 'audio') {
-                        let stream = event.streams[0] || new MediaStream([event.track]);
-                        remoteAud.srcObject = stream;
-                        remoteAud.play().catch(()=>{});
-                    }
+                    
+                    // Force audio output to be active
+                    remoteVid.muted = false;
+                    remoteVid.volume = 1.0;
+                    remoteVid.play().catch(err => console.warn("Remote play error", err));
                 };
 
                 RTC.pc.oniceconnectionstatechange = () => {
                     if (RTC.pc.iceConnectionState === 'disconnected' || RTC.pc.iceConnectionState === 'failed') {
+                        showToast("Call dropped. Connection lost.", "error");
                         endCallLocal();
-                        showToast("Call lost due to network issues.", "error");
                     }
                 };
 
@@ -2052,6 +2051,8 @@
                 };
 
                 await RTC.pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                RTC.processIceQueue(); // Immediately process any queued caller candidates
+                
                 const answer = await RTC.pc.createAnswer();
                 await RTC.pc.setLocalDescription(answer);
 
@@ -2063,7 +2064,11 @@
                 iceCallerListener = snap => {
                     if(snap.val() && RTC.pc) {
                         const candidate = new RTCIceCandidate(snap.val());
-                        RTC.pc.addIceCandidate(candidate).catch(e => console.error(e));
+                        if (RTC.pc.remoteDescription && RTC.pc.remoteDescription.type) {
+                            RTC.pc.addIceCandidate(candidate).catch(e => console.error(e));
+                        } else {
+                            RTC.iceQueue.push(candidate);
+                        }
                     }
                 };
                 RTC.callRef.child('iceCandidates/caller').on('child_added', iceCallerListener);
@@ -2103,6 +2108,8 @@
             stopRingtone();
             releaseWakeLock();
             
+            RTC.iceQueue = [];
+
             if (RTC.callRef) { RTC.callRef.onDisconnect().cancel(); }
 
             if (RTC.pc) { 
@@ -2115,11 +2122,11 @@
                 RTC.localStream.getTracks().forEach(t => t.stop()); 
                 RTC.localStream = null; 
             }
+            RTC.remoteStream = null;
             
             document.getElementById('active-call-overlay').style.display = 'none';
             document.getElementById('local-video').srcObject = null;
             document.getElementById('remote-video').srcObject = null;
-            document.getElementById('remote-audio').srcObject = null;
             document.getElementById('active-call-status').innerText = '';
 
             if (RTC.targetPhone) {
@@ -2169,9 +2176,9 @@
             currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
             
             try {
+                // Instantly swap track without touching audio constraints
                 const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: currentFacingMode },
-                    audio: false // Only replacing video track
+                    video: { facingMode: { exact: currentFacingMode } }
                 }).catch(e => navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })); // Fallback
                 
                 const newVideoTrack = newStream.getVideoTracks()[0];
